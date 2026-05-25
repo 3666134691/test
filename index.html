@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>资料查询系统 GYM </title>
+    <title>资料查询系统 GYM</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +12,6 @@
             font-family: "Microsoft Yahei", sans-serif;
         }
 
-        /* 淡蓝色渐变背景 */
         body {
             background: linear-gradient(120deg, #e6f2ff, #cfe7fb);
             min-height: 100vh;
@@ -240,9 +239,10 @@
 
     <script>
         const PASSWD = "1402";
-        // 纯本地相对路径，不加任何线上域名
         const EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
         let currentPath = "";
+        let pageList = [];     // 存放页码信息
+        let imageData = [];    // 存放成功加载的图片DOM
 
         // 密钥验证
         function checkPwd() {
@@ -267,10 +267,11 @@
                 return;
             }
 
-            // 纯相对路径，本地离线可用
             currentPath = `RES/${sub}/${gra}/${typ}/${les}/`;
             document.getElementById("result").innerText = "本地路径：" + currentPath;
             document.getElementById("imageBox").innerHTML = "";
+            pageList = [];
+            imageData = [];
             document.getElementById("modal").style.display = "block";
         }
 
@@ -280,7 +281,7 @@
             document.getElementById("pageInput").value = "";
         }
 
-        // 解析页码范围并加载
+        // 解析页码范围
         function loadImages() {
             let val = document.getElementById("pageInput").value.trim();
             closeModal();
@@ -294,12 +295,20 @@
                 start = end = parseInt(val);
             }
 
+            // 生成顺序页码列表
+            pageList = [];
+            imageData = [];
             for (let i = start; i <= end; i++) {
-                tryLoadImg(i);
+                pageList.push(i);
             }
+
+            // 逐个尝试加载
+            pageList.forEach(page => {
+                tryLoadImg(page);
+            });
         }
 
-        // 逐个格式尝试加载本地图片
+        // 逐个格式尝试加载图片
         function tryLoadImg(page) {
             let idx = 0;
             function tryNext() {
@@ -308,16 +317,19 @@
                 let img = new Image();
 
                 img.onload = function () {
-                    // 加载成功，渲染图片+下载按钮
+                    // 保存图片DOM和页码
                     let div = document.createElement("div");
                     div.className = "image-item";
+                    div.dataset.page = page;
                     div.innerHTML = `
                         <p>第${page}页</p>
                         <img src="${imgUrl}" alt="DOMAIN${page}">
                         <br>
                         <a href="${imgUrl}" class="download-btn" download>下载第${page}页</a>
                     `;
-                    document.getElementById("imageBox").appendChild(div);
+                    imageData.push({page: page, dom: div});
+                    // 重新按页码排序渲染
+                    sortAndRender();
                 };
 
                 img.onerror = function () {
@@ -327,6 +339,19 @@
                 img.src = imgUrl;
             }
             tryNext();
+        }
+
+        // 按页码从小到大排序 → 重新渲染
+        function sortAndRender(){
+            // 升序排序
+            imageData.sort((a,b) => a.page - b.page);
+            // 清空容器
+            const box = document.getElementById("imageBox");
+            box.innerHTML = "";
+            // 按排序后依次插入
+            imageData.forEach(item => {
+                box.appendChild(item.dom);
+            });
         }
     </script>
 </body>
