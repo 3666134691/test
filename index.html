@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高弈铭考试查询系统（test only）</title>
+    <title>资料查询系统</title>
     <style>
         * {
             margin: 0;
@@ -59,7 +59,6 @@
             color: #fff;
             border: none;
             border-radius: 8px;
-            font-size: 16px;
             cursor: pointer;
         }
 
@@ -120,14 +119,6 @@
             word-break: break-all;
         }
 
-        .status-tip {
-            margin: 15px 0;
-            padding: 12px;
-            background: #e8f4ff;
-            border-radius: 8px;
-            color: #1967b3;
-        }
-
         .batch-bar {
             margin: 20px 0;
             text-align: center;
@@ -180,7 +171,7 @@
         .modal input {
             margin: 15px 0;
             padding: 10px;
-            width: 200px;
+            width 200px;
             border: 1px solid #b3d8f4;
             border-radius: 6px;
             outline: none;
@@ -235,7 +226,6 @@
             </div>
 
             <div class="result" id="result"></div>
-            <div class="status-tip" id="statusTip">等待加载</div>
 
             <div class="batch-bar">
                 <button class="btn btn-green" id="batchDownBtn" style="display:none;" onclick="batchDownload()">批量下载所有图片</button>
@@ -257,13 +247,10 @@
     <script>
         const PASSWD = "1403";
         const EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
-        // 关键修正：GitHub Pages 线上地址
         const BASE_URL = "https://3666134691.github.io/test/";
         let currentPath = "";
         let pageList = [];
         let imageData = [];
-        let totalTask = 0;
-        let loadedTask = 0;
 
         function checkPwd() {
             let v = document.getElementById("pwd").value.trim();
@@ -286,12 +273,10 @@
                 return;
             }
 
-            // 拼接线上完整路径
             currentPath = `${BASE_URL}RES/${sub}/${gra}/${typ}/${les}/`;
-            document.getElementById("result").innerText = "线上路径：" + currentPath;
+            document.getElementById("result").innerText = "路径：" + currentPath;
             document.getElementById("imageBox").innerHTML = "";
             imageData = [];
-            loadedTask = 0;
             document.getElementById("batchDownBtn").style.display = "none";
             document.getElementById("modal").style.display = "block";
         }
@@ -313,51 +298,32 @@
             }
             pageList = [];
             imageData = [];
-            loadedTask = 0;
             for (let i = start; i <= end; i++) {
                 pageList.push(i);
             }
-            totalTask = pageList.length * EXTS.length;
         }
 
-        // 预览加载
         function loadImages() {
             closeModal();
             parsePageRange();
-            document.getElementById("statusTip").innerText = "正在加载 0%";
             document.getElementById("imageBox").innerHTML = "";
             pageList.forEach(page => tryLoadImg(page, true));
         }
 
-        // 仅获取不预览
         function onlyGetFile() {
             closeModal();
             parsePageRange();
-            document.getElementById("statusTip").innerText = "正在加载 0%";
             pageList.forEach(page => tryLoadImg(page, false));
         }
 
-        function tryLoadImg(page, needPreview) {
+        function tryLoadImg(page) {
             let idx = 0;
             function tryNext() {
-                loadedTask++;
-                // 真实进度
-                let percent = Math.floor(loadedTask / totalTask * 100);
-                document.getElementById("statusTip").innerText = `正在加载资源 ${percent}%`;
-
-                if (idx >= EXTS.length) {
-                    if (loadedTask >= totalTask) {
-                        document.getElementById("statusTip").innerText = "加载完成";
-                        if(imageData.length > 0){
-                            document.getElementById("batchDownBtn").style.display = "inline-block";
-                        }
-                    }
-                    return;
-                }
+                if (idx >= EXTS.length) return;
 
                 let imgUrl = currentPath + "DOMAIN" + page + "." + EXTS[idx];
                 let img = new Image();
-                img.crossOrigin = "anonymous"; // 解决跨域问题
+                img.crossOrigin = "anonymous";
 
                 img.onload = function () {
                     let div = document.createElement("div");
@@ -370,7 +336,8 @@
                         <a href="${imgUrl}" class="download-btn" download>下载第${page}页</a>
                     `;
                     imageData.push({ page, dom: div, url: imgUrl });
-                    sortAndRender(needPreview);
+                    sortAndRender();
+                    document.getElementById("batchDownBtn").style.display = "inline-block";
                 };
 
                 img.onerror = function () {
@@ -382,14 +349,12 @@
             tryNext();
         }
 
-        // 按页码排序
-        function sortAndRender(needPreview) {
+        // 按页码从小到大排序
+        function sortAndRender() {
             imageData.sort((a, b) => a.page - b.page);
             const box = document.getElementById("imageBox");
             box.innerHTML = "";
-            if (needPreview) {
-                imageData.forEach(item => box.appendChild(item.dom));
-            }
+            imageData.forEach(item => box.appendChild(item.dom));
         }
 
         // 批量下载
