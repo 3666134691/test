@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>资料查询系统</title>
+    <title>资料查询 纯本地版</title>
     <style>
         * {
             margin: 0;
@@ -171,7 +171,7 @@
         .modal input {
             margin: 15px 0;
             padding: 10px;
-            width 200px;
+            width: 200px;
             border: 1px solid #b3d8f4;
             border-radius: 6px;
             outline: none;
@@ -247,11 +247,12 @@
     <script>
         const PASSWD = "1403";
         const EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
-        const BASE_URL = "https://3666134691.github.io/test/";
+        // 纯本地相对路径，不写任何线上域名
         let currentPath = "";
         let pageList = [];
         let imageData = [];
 
+        // 密钥登录
         function checkPwd() {
             let v = document.getElementById("pwd").value.trim();
             if (v === PASSWD) {
@@ -262,6 +263,7 @@
             }
         }
 
+        // 拼接本地路径 保留RES
         function startSearch() {
             let sub = document.getElementById("subject").value;
             let gra = document.getElementById("grade").value;
@@ -273,8 +275,9 @@
                 return;
             }
 
-            currentPath = `${BASE_URL}RES/${sub}/${gra}/${typ}/${les}/`;
-            document.getElementById("result").innerText = "路径：" + currentPath;
+            // 纯本地相对路径
+            currentPath = `RES/${sub}/${gra}/${typ}/${les}/`;
+            document.getElementById("result").innerText = "本地路径：" + currentPath;
             document.getElementById("imageBox").innerHTML = "";
             imageData = [];
             document.getElementById("batchDownBtn").style.display = "none";
@@ -286,6 +289,7 @@
             document.getElementById("pageInput").value = "";
         }
 
+        // 解析页码范围
         function parsePageRange() {
             let val = document.getElementById("pageInput").value.trim();
             let start, end;
@@ -303,6 +307,7 @@
             }
         }
 
+        // 预览加载图片
         function loadImages() {
             closeModal();
             parsePageRange();
@@ -310,20 +315,21 @@
             pageList.forEach(page => tryLoadImg(page, true));
         }
 
+        // 仅获取不预览 → 直接有下载按钮
         function onlyGetFile() {
             closeModal();
             parsePageRange();
             pageList.forEach(page => tryLoadImg(page, false));
         }
 
-        function tryLoadImg(page) {
+        // 尝试多格式加载
+        function tryLoadImg(page, needPreview) {
             let idx = 0;
             function tryNext() {
                 if (idx >= EXTS.length) return;
 
                 let imgUrl = currentPath + "DOMAIN" + page + "." + EXTS[idx];
                 let img = new Image();
-                img.crossOrigin = "anonymous";
 
                 img.onload = function () {
                     let div = document.createElement("div");
@@ -331,12 +337,12 @@
                     div.dataset.page = page;
                     div.innerHTML = `
                         <p>第${page}页</p>
-                        <img src="${imgUrl}">
+                        ${needPreview ? `<img src="${imgUrl}">` : ''}
                         <br>
                         <a href="${imgUrl}" class="download-btn" download>下载第${page}页</a>
                     `;
                     imageData.push({ page, dom: div, url: imgUrl });
-                    sortAndRender();
+                    sortAndRender(needPreview);
                     document.getElementById("batchDownBtn").style.display = "inline-block";
                 };
 
@@ -350,14 +356,16 @@
         }
 
         // 按页码从小到大排序
-        function sortAndRender() {
+        function sortAndRender(needPreview) {
             imageData.sort((a, b) => a.page - b.page);
             const box = document.getElementById("imageBox");
             box.innerHTML = "";
-            imageData.forEach(item => box.appendChild(item.dom));
+            if (needPreview) {
+                imageData.forEach(item => box.appendChild(item.dom));
+            }
         }
 
-        // 批量下载
+        // 批量自动下载
         function batchDownload() {
             imageData.sort((a, b) => a.page - b.page);
             imageData.forEach(item => {
