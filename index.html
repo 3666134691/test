@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>资料查询系统 GYM</title>
+    <title>高弈铭考试查询系统（测试版）</title>
     <style>
         * {
             margin: 0;
@@ -100,14 +100,18 @@
             outline: none;
         }
 
-        #searchBtn {
+        .btn {
             padding: 12px 28px;
             background: #2d8cf0;
             color: #fff;
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            transition: 0.2s;
         }
+        .btn:hover { background: #1967b3; }
+        .btn-green { background: #19be6b; }
+        .btn-green:hover { background: #0fa85a; }
 
         .result {
             margin-top: 25px;
@@ -116,6 +120,14 @@
             border-radius: 8px;
             line-height: 1.8;
             word-break: break-all;
+        }
+
+        .status-tip {
+            margin:15px 0;
+            padding:12px;
+            background:#e8f4ff;
+            border-radius:8px;
+            color:#1967b3;
         }
 
         .image-box {
@@ -150,6 +162,11 @@
             text-decoration: none;
         }
 
+        .batch-bar {
+            margin:20px 0;
+            text-align:center;
+        }
+
         .modal {
             position: fixed;
             top: 50%;
@@ -162,7 +179,6 @@
             display: none;
             text-align: center;
         }
-
         .modal input {
             margin: 15px 0;
             padding: 10px;
@@ -171,7 +187,6 @@
             border-radius: 6px;
             outline: none;
         }
-
         .modal button {
             margin: 0 8px;
             padding: 8px 20px;
@@ -184,15 +199,13 @@
 
 <body>
     <div class="wrap">
-        <!-- 登录界面 -->
         <div class="login-box" id="loginBox">
             <h2>内部资料查询</h2>
             <input type="password" id="pwd" placeholder="请输入访问密钥">
             <br>
-            <button onclick="checkPwd()">验证进入</button>
+            <button onclick="checkPwd()" class="btn">验证进入</button>
         </div>
 
-        <!-- 查询主界面 -->
         <div class="search-page" id="searchPage">
             <div class="search-title">选择查询条件</div>
             <div class="form-row">
@@ -220,29 +233,38 @@
                 </select>
 
                 <input type="text" id="lesson" placeholder="输入课时 如11.1">
-                <button id="searchBtn" onclick="startSearch()">查询</button>
+                <button onclick="startSearch()" class="btn">查询</button>
             </div>
 
             <div class="result" id="result"></div>
+            <div class="status-tip" id="statusTip">等待查询</div>
+
+            <div class="batch-bar">
+                <button class="btn btn-green" id="batchDownBtn" style="display:none;" onclick="batchDownload()">批量下载所有图片</button>
+            </div>
+
             <div class="image-box" id="imageBox"></div>
         </div>
     </div>
 
-    <!-- 页码输入弹窗 -->
     <div class="modal" id="modal">
         <p>输入页码（单页填1，区间填1-3）</p>
         <input type="text" id="pageInput" placeholder="例：1-3">
         <br><br>
-        <button onclick="loadImages()">确认加载</button>
+        <button onclick="loadImages()" class="btn">预览并加载</button>
+        <button onclick="onlyGetFile()" class="btn btn-green">仅获取不预览、直接可下载</button>
         <button onclick="closeModal()">取消</button>
     </div>
 
     <script>
-        const PASSWD = "1402";
+        // 密钥已改为1403
+        const PASSWD = "1403";
         const EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
         let currentPath = "";
-        let pageList = [];     // 存放页码信息
-        let imageData = [];    // 存放成功加载的图片DOM
+        let pageList = [];
+        let imageData = [];
+        let totalCheck = 0;
+        let successCount = 0;
 
         // 密钥验证
         function checkPwd() {
@@ -255,7 +277,6 @@
             }
         }
 
-        // 拼接本地路径
         function startSearch() {
             let sub = document.getElementById("subject").value;
             let gra = document.getElementById("grade").value;
@@ -270,22 +291,19 @@
             currentPath = `RES/${sub}/${gra}/${typ}/${les}/`;
             document.getElementById("result").innerText = "本地路径：" + currentPath;
             document.getElementById("imageBox").innerHTML = "";
-            pageList = [];
             imageData = [];
+            document.getElementById("batchDownBtn").style.display = "none";
             document.getElementById("modal").style.display = "block";
         }
 
-        // 关闭弹窗
         function closeModal() {
             document.getElementById("modal").style.display = "none";
             document.getElementById("pageInput").value = "";
         }
 
         // 解析页码范围
-        function loadImages() {
+        function parsePageRange(){
             let val = document.getElementById("pageInput").value.trim();
-            closeModal();
-
             let start, end;
             if (val.includes("-")) {
                 let arr = val.split("-");
@@ -294,30 +312,59 @@
             } else {
                 start = end = parseInt(val);
             }
-
-            // 生成顺序页码列表
             pageList = [];
             imageData = [];
             for (let i = start; i <= end; i++) {
                 pageList.push(i);
             }
+            totalCheck = pageList.length;
+            successCount = 0;
+            return {start,end};
+        }
 
-            // 逐个尝试加载
+        // 预览加载图片
+        function loadImages() {
+            closeModal();
+            parsePageRange();
+            document.getElementById("statusTip").innerText = `正在加载图片，已完成 0%`;
+            document.getElementById("imageBox").innerHTML = "";
+
             pageList.forEach(page => {
-                tryLoadImg(page);
+                tryLoadImg(page, true);
             });
         }
 
-        // 逐个格式尝试加载图片
-        function tryLoadImg(page) {
+        // 仅获取不预览，只收集下载链接
+        function onlyGetFile(){
+            closeModal();
+            parsePageRange();
+            document.getElementById("statusTip").innerText = `正在检测图片是否存在...`;
+            pageList.forEach(page => {
+                tryLoadImg(page, false);
+            });
+        }
+
+        // 尝试加载图片
+        function tryLoadImg(page, needPreview) {
             let idx = 0;
             function tryNext() {
-                if (idx >= EXTS.length) return;
+                if (idx >= EXTS.length) {
+                    let percent = Math.floor((successCount / totalCheck) * 100);
+                    document.getElementById("statusTip").innerText =
+                        `第${page}页 不存在 | 已成功${successCount}张 / 共检测${totalCheck}张 | 完成${percent}%`;
+
+                    if(successCount === 0 && percent === 100){
+                        document.getElementById("statusTip").innerText = "加载失败：该路径下无任何有效图片";
+                    }
+                    return;
+                }
                 let imgUrl = currentPath + "DOMAIN" + page + "." + EXTS[idx];
                 let img = new Image();
 
                 img.onload = function () {
-                    // 保存图片DOM和页码
+                    successCount++;
+                    let percent = Math.floor((successCount / totalCheck) * 100);
+
                     let div = document.createElement("div");
                     div.className = "image-item";
                     div.dataset.page = page;
@@ -327,9 +374,21 @@
                         <br>
                         <a href="${imgUrl}" class="download-btn" download>下载第${page}页</a>
                     `;
-                    imageData.push({page: page, dom: div});
-                    // 重新按页码排序渲染
-                    sortAndRender();
+                    imageData.push({page: page, dom: div, url:imgUrl});
+
+                    sortAndRender(needPreview);
+
+                    document.getElementById("statusTip").innerText =
+                        `正在加载，已成功${successCount}张 / 共${totalCheck}张 | 完成${percent}%`;
+
+                    // 全部检测完成
+                    if(successCount + (totalCheck - pageList.length) === totalCheck){
+                        document.getElementById("statusTip").innerText =
+                            `加载完成：有效图片${successCount}张，无效${totalCheck-successCount}张`;
+                        if(successCount > 0){
+                            document.getElementById("batchDownBtn").style.display = "inline-block";
+                        }
+                    }
                 };
 
                 img.onerror = function () {
@@ -341,16 +400,28 @@
             tryNext();
         }
 
-        // 按页码从小到大排序 → 重新渲染
-        function sortAndRender(){
-            // 升序排序
+        // 排序渲染
+        function sortAndRender(needPreview){
             imageData.sort((a,b) => a.page - b.page);
-            // 清空容器
             const box = document.getElementById("imageBox");
             box.innerHTML = "";
-            // 按排序后依次插入
-            imageData.forEach(item => {
-                box.appendChild(item.dom);
+            if(needPreview){
+                imageData.forEach(item => {
+                    box.appendChild(item.dom);
+                });
+            }
+        }
+
+        // 批量下载（逐个触发浏览器下载）
+        function batchDownload(){
+            imageData.sort((a,b)=>a.page-b.page);
+            imageData.forEach(item=>{
+                let a = document.createElement("a");
+                a.href = item.url;
+                a.download = "DOMAIN"+item.page;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             });
         }
     </script>
