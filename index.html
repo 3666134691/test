@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高弈铭考试查询系统（测试版）</title>
+    <title>高弈铭考试查询系统（test only）</title>
     <style>
         * {
             margin: 0;
@@ -107,27 +107,30 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            transition: 0.2s;
         }
-        .btn:hover { background: #1967b3; }
-        .btn-green { background: #19be6b; }
-        .btn-green:hover { background: #0fa85a; }
+        .btn-green {
+            background: #19be6b;
+        }
 
         .result {
             margin-top: 25px;
             padding: 20px;
             background: #f5f9ff;
             border-radius: 8px;
-            line-height: 1.8;
             word-break: break-all;
         }
 
         .status-tip {
-            margin:15px 0;
-            padding:12px;
-            background:#e8f4ff;
-            border-radius:8px;
-            color:#1967b3;
+            margin: 15px 0;
+            padding: 12px;
+            background: #e8f4ff;
+            border-radius: 8px;
+            color: #1967b3;
+        }
+
+        .batch-bar {
+            margin: 20px 0;
+            text-align: center;
         }
 
         .image-box {
@@ -160,11 +163,6 @@
             cursor: pointer;
             display: inline-block;
             text-decoration: none;
-        }
-
-        .batch-bar {
-            margin:20px 0;
-            text-align:center;
         }
 
         .modal {
@@ -237,7 +235,7 @@
             </div>
 
             <div class="result" id="result"></div>
-            <div class="status-tip" id="statusTip">等待查询</div>
+            <div class="status-tip" id="statusTip">等待加载</div>
 
             <div class="batch-bar">
                 <button class="btn btn-green" id="batchDownBtn" style="display:none;" onclick="batchDownload()">批量下载所有图片</button>
@@ -252,28 +250,26 @@
         <input type="text" id="pageInput" placeholder="例：1-3">
         <br><br>
         <button onclick="loadImages()" class="btn">预览并加载</button>
-        <button onclick="onlyGetFile()" class="btn btn-green">仅获取不预览、直接可下载</button>
+        <button onclick="onlyGetFile()" class="btn btn-green">仅获取不预览</button>
         <button onclick="closeModal()">取消</button>
     </div>
 
     <script>
-        // 密钥已改为1403
         const PASSWD = "1403";
         const EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
         let currentPath = "";
         let pageList = [];
         let imageData = [];
-        let totalCheck = 0;
-        let successCount = 0;
+        let totalTask = 0;
+        let loadedTask = 0;
 
-        // 密钥验证
         function checkPwd() {
             let v = document.getElementById("pwd").value.trim();
             if (v === PASSWD) {
                 document.getElementById("loginBox").style.display = "none";
                 document.getElementById("searchPage").style.display = "block";
             } else {
-                alert("密钥错误，请重新输入");
+                alert("密钥错误");
             }
         }
 
@@ -284,7 +280,7 @@
             let les = document.getElementById("lesson").value.trim();
 
             if (!sub || !gra || !typ || !les) {
-                alert("请完整选择学科、年级、类型并输入课时");
+                alert("请完整选择所有条件");
                 return;
             }
 
@@ -292,6 +288,7 @@
             document.getElementById("result").innerText = "本地路径：" + currentPath;
             document.getElementById("imageBox").innerHTML = "";
             imageData = [];
+            loadedTask = 0;
             document.getElementById("batchDownBtn").style.display = "none";
             document.getElementById("modal").style.display = "block";
         }
@@ -301,8 +298,7 @@
             document.getElementById("pageInput").value = "";
         }
 
-        // 解析页码范围
-        function parsePageRange(){
+        function parsePageRange() {
             let val = document.getElementById("pageInput").value.trim();
             let start, end;
             if (val.includes("-")) {
@@ -314,81 +310,63 @@
             }
             pageList = [];
             imageData = [];
+            loadedTask = 0;
             for (let i = start; i <= end; i++) {
                 pageList.push(i);
             }
-            totalCheck = pageList.length;
-            successCount = 0;
-            return {start,end};
+            totalTask = pageList.length * EXTS.length;
         }
 
-        // 预览加载图片
+        // 预览加载
         function loadImages() {
             closeModal();
             parsePageRange();
-            document.getElementById("statusTip").innerText = `正在加载图片，已完成 0%`;
+            document.getElementById("statusTip").innerText = "正在加载 0%";
             document.getElementById("imageBox").innerHTML = "";
-
-            pageList.forEach(page => {
-                tryLoadImg(page, true);
-            });
+            pageList.forEach(page => tryLoadImg(page, true));
         }
 
-        // 仅获取不预览，只收集下载链接
-        function onlyGetFile(){
+        // 仅获取不预览
+        function onlyGetFile() {
             closeModal();
             parsePageRange();
-            document.getElementById("statusTip").innerText = `正在检测图片是否存在...`;
-            pageList.forEach(page => {
-                tryLoadImg(page, false);
-            });
+            document.getElementById("statusTip").innerText = "正在加载 0%";
+            pageList.forEach(page => tryLoadImg(page, false));
         }
 
-        // 尝试加载图片
         function tryLoadImg(page, needPreview) {
             let idx = 0;
             function tryNext() {
-                if (idx >= EXTS.length) {
-                    let percent = Math.floor((successCount / totalCheck) * 100);
-                    document.getElementById("statusTip").innerText =
-                        `第${page}页 不存在 | 已成功${successCount}张 / 共检测${totalCheck}张 | 完成${percent}%`;
+                loadedTask++;
+                // 真实进度
+                let percent = Math.floor(loadedTask / totalTask * 100);
+                document.getElementById("statusTip").innerText = `正在加载资源 ${percent}%`;
 
-                    if(successCount === 0 && percent === 100){
-                        document.getElementById("statusTip").innerText = "加载失败：该路径下无任何有效图片";
+                if (idx >= EXTS.length) {
+                    if (loadedTask >= totalTask) {
+                        document.getElementById("statusTip").innerText = "加载完成";
+                        if(imageData.length > 0){
+                            document.getElementById("batchDownBtn").style.display = "inline-block";
+                        }
                     }
                     return;
                 }
+
                 let imgUrl = currentPath + "DOMAIN" + page + "." + EXTS[idx];
                 let img = new Image();
 
                 img.onload = function () {
-                    successCount++;
-                    let percent = Math.floor((successCount / totalCheck) * 100);
-
                     let div = document.createElement("div");
                     div.className = "image-item";
                     div.dataset.page = page;
                     div.innerHTML = `
                         <p>第${page}页</p>
-                        <img src="${imgUrl}" alt="DOMAIN${page}">
+                        <img src="${imgUrl}">
                         <br>
                         <a href="${imgUrl}" class="download-btn" download>下载第${page}页</a>
                     `;
-                    imageData.push({page: page, dom: div, url:imgUrl});
-
+                    imageData.push({ page, dom: div, url: imgUrl });
                     sortAndRender(needPreview);
-
-                    document.getElementById("statusTip").innerText =
-                        `正在加载，已成功${successCount}张 / 共${totalCheck}张 | 完成${percent}%`;
-
-                    // 全部检测完成
-                    if(successCount + (totalCheck - pageList.length) === totalCheck){
-                        document.getElementById("statusTip").innerText =
-                            `加载完成：有效图片${successCount}张，无效${totalCheck-successCount}张`;
-                        if(successCount > 0){
-                            document.getElementById("batchDownBtn").style.display = "inline-block";
-                        }
-                    }
                 };
 
                 img.onerror = function () {
@@ -400,25 +378,23 @@
             tryNext();
         }
 
-        // 排序渲染
-        function sortAndRender(needPreview){
-            imageData.sort((a,b) => a.page - b.page);
+        // 按页码排序
+        function sortAndRender(needPreview) {
+            imageData.sort((a, b) => a.page - b.page);
             const box = document.getElementById("imageBox");
             box.innerHTML = "";
-            if(needPreview){
-                imageData.forEach(item => {
-                    box.appendChild(item.dom);
-                });
+            if (needPreview) {
+                imageData.forEach(item => box.appendChild(item.dom));
             }
         }
 
-        // 批量下载（逐个触发浏览器下载）
-        function batchDownload(){
-            imageData.sort((a,b)=>a.page-b.page);
-            imageData.forEach(item=>{
+        // 批量下载
+        function batchDownload() {
+            imageData.sort((a, b) => a.page - b.page);
+            imageData.forEach(item => {
                 let a = document.createElement("a");
                 a.href = item.url;
-                a.download = "DOMAIN"+item.page;
+                a.download = "DOMAIN" + item.page;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
